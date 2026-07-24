@@ -1,5 +1,13 @@
 # WORKLOG — notification-sdk-ios
 
+## 2026-07-24 — NotificationSDK SwiftPM release readiness
+
+- 목적: iOS NotificationSDK를 Swift Package Manager Git URL로 붙일 수 있는 배포 준비 상태로 정리한다.
+- 결과: GitHub Actions SwiftPM CI, README Git URL/branch/SemVer 설치 예시, release checklist와 HANDOFF 기준을 추가했다.
+- 검증: `swift package resolve`, `swift package describe`, `swift test` 7 tests, workflow YAML parse, `git diff --check` 통과.
+- 상세 로그:
+  [docs/work-logs/2026-07-24-03-notification-sdk-spm-release-readiness.md](docs/work-logs/2026-07-24-03-notification-sdk-spm-release-readiness.md)
+
 ## 2026-07-24 — iOS Notification SDK integration guide
 
 - 목적: AuthSDK token provider를 받아 NotificationSDK를 사용하는 iOS 앱 통합 방식을 문서화한다.

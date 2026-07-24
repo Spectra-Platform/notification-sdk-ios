@@ -23,6 +23,8 @@ stable enough for `20 Spectra — 앱 개발자` to integrate into Spectra iOS.
   this package yet; the existing `spectra-ios` manager remains the implementation
   reference for that behavior.
 - iOS app integration guide lives at `docs/guides/ios-notification-sdk-integration.md`.
+- Swift Package Manager 배포는 Git URL 기반으로 시작한다. repository URL은 `https://github.com/Spectra-Platform/notification-sdk-ios.git`, product 이름은 `SpectraNotificationSDK`다.
+- release tag는 `vMAJOR.MINOR.PATCH` 형식으로 만들며, 최초 tag는 공개 버전 번호를 확정한 뒤 생성한다. 현재 문서와 CI는 tag 배포가 가능한 상태를 준비하지만 tag 자체는 만들지 않는다.
 
 ## Current implementation boundary
 
@@ -31,6 +33,8 @@ stable enough for `20 Spectra — 앱 개발자` to integrate into Spectra iOS.
   E2E is performed.
 - GitHub remote is configured as `https://github.com/Spectra-Platform/notification-sdk-ios.git`.
 - Local `main` tracks `origin/main`.
+- `.github/workflows/ci.yml` validates SwiftPM resolve/describe/test.
+- SwiftPM release checklist lives at `docs/guides/release-checklist.md`.
 
 ## Next checks before integration
 
