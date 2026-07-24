@@ -22,6 +22,7 @@ stable enough for `20 Spectra — 앱 개발자` to integrate into Spectra iOS.
 - Sound binary download and `Library/Sounds` persistence are not implemented in
   this package yet; the existing `spectra-ios` manager remains the implementation
   reference for that behavior.
+- iOS app integration guide lives at `docs/guides/ios-notification-sdk-integration.md`.
 
 ## Current implementation boundary
 

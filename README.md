@@ -2,6 +2,8 @@
 
 Local Swift Package for Spectra Platform Push/Notification integration.
 
+For app integration, use [iOS NotificationSDK integration guide](docs/guides/ios-notification-sdk-integration.md).
+
 Implemented first slice:
 
 - Project-token based device registration
