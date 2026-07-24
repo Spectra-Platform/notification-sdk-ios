@@ -33,9 +33,8 @@ public struct SpectraNotificationClient: Sendable {
         self.tokenProvider = tokenProvider
         self.transport = transport
         self.encoder = JSONEncoder()
-        self.decoder = JSONDecoder()
+        self.decoder = Self.makeDecoder()
         self.encoder.dateEncodingStrategy = .iso8601
-        self.decoder.dateDecodingStrategy = .iso8601
     }
 
     public func registerDevice(_ registration: SpectraPushDeviceRegistration) async throws -> SpectraPushDevice {
@@ -65,6 +64,26 @@ public struct SpectraNotificationClient: Sendable {
         )
         request.httpBody = try encoder.encode(push)
         let response: Envelope<SpectraPushQueuedDelivery> = try await send(request, expectedStatusCodes: [202])
+        return response.data
+    }
+
+    public func sendEmail(_ email: SpectraEmailDeliveryRequest) async throws -> SpectraEmailQueuedDelivery {
+        var request = try await makeRequest(
+            method: "POST",
+            path: "email/delivery-requests",
+            idempotencyKey: email.idempotencyKey
+        )
+        request.httpBody = try encoder.encode(email)
+        let response: Envelope<SpectraEmailQueuedDelivery> = try await send(request, expectedStatusCodes: [202])
+        return response.data
+    }
+
+    public func fetchEmailDeliveryRequest(_ requestId: UUID) async throws -> SpectraEmailDeliveryStatus {
+        let request = try await makeRequest(
+            method: "GET",
+            path: "email/delivery-requests/\(requestId.uuidString.lowercased())"
+        )
+        let response: Envelope<SpectraEmailDeliveryStatus> = try await send(request, expectedStatusCodes: [200])
         return response.data
     }
 
@@ -134,5 +153,34 @@ public struct SpectraNotificationClient: Sendable {
 
     private func percentEncode(_ value: String) -> String {
         value.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? value
+    }
+
+    private static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            if let date = Self.iso8601DateWithFractionalSeconds(from: value) {
+                return date
+            }
+            if let date = Self.iso8601Date(from: value) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Expected an RFC3339 timestamp."
+            )
+        }
+        return decoder
+    }
+
+    private static func iso8601DateWithFractionalSeconds(from value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value)
+    }
+
+    private static func iso8601Date(from value: String) -> Date? {
+        ISO8601DateFormatter().date(from: value)
     }
 }

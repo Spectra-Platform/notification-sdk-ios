@@ -43,6 +43,7 @@ Implemented first slice:
 - Project-token based device registration
 - Device deactivation
 - Test push delivery request
+- Project-token based single email delivery request through Delivery Platform
 - Community user-token based APNs device registration through
   `PUT /v1/me/devices/{installation_id}` and device deactivation through
   `DELETE /v1/me/devices/{installation_id}`
@@ -50,6 +51,12 @@ Implemented first slice:
 
 The SDK does not persist downloaded sound files yet. iOS `Library/Sounds`
 download and checksum management remains a later implementation slice.
+
+Email delivery requests are server-side requests, not local SMTP sends. Apps
+provide an AuthSDK-backed token provider to `SpectraNotificationClient`; the SDK
+then calls `POST /platform/v1/projects/{project_id}/email/delivery-requests`.
+Delivery Platform validates the project token through Auth Platform before
+queueing provider work.
 
 ## 로컬 검증
 

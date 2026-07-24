@@ -16,6 +16,15 @@ stable enough for `20 Spectra — 앱 개발자` to integrate into Spectra iOS.
   `PUT /platform/v1/projects/{project_id}/notification/devices/{device_id}`.
 - Test push uses device-bound enqueue:
   `POST /platform/v1/projects/{project_id}/notification/delivery-requests`.
+- Single email send uses the Delivery Platform project API:
+  `POST /platform/v1/projects/{project_id}/email/delivery-requests`.
+  The SDK never sends SMTP itself and never stores project secrets; it only asks
+  the injected AuthSDK-compatible token provider for a short-lived access token.
+  Delivery Platform must verify the token against Auth Platform and the requested
+  project/scope before enqueueing.
+- Email status recovery uses:
+  `GET /platform/v1/projects/{project_id}/email/delivery-requests/{request_id}`
+  and exposes privacy-safe metadata only.
 - Dynamic notification sound sync uses:
   - `GET /platform/v1/projects/{project_id}/notification/devices/{device_id}/sound-manifest`
   - `PUT /platform/v1/projects/{project_id}/notification/devices/{device_id}/sound-installations`

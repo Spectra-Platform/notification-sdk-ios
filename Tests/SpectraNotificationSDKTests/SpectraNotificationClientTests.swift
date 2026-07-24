@@ -63,6 +63,73 @@ final class SpectraNotificationClientTests: XCTestCase {
         XCTAssertEqual(queued.status, "queued")
     }
 
+    func testSendEmailUsesAuthTokenProviderAndProjectEmailPath() async throws {
+        let requestId = UUID(uuidString: "00000000-0000-4000-8000-000000000006")!
+        let response = #"{"data":{"request_id":"\#(requestId.uuidString.lowercased())","status":"accepted","created_at":"2026-07-24T02:20:00.000Z"}}"#.data(using: .utf8)!
+        let transport = RecordingTransport(response: response, statusCode: 202)
+        let client = makeClient(transport: transport)
+
+        let queued = try await client.sendEmail(.init(
+            recipientEmail: "recipient@example.test",
+            subject: "Spectra verification",
+            text: "Your code is 123456",
+            html: "<p>Your code is <strong>123456</strong></p>",
+            idempotencyKey: "email-1"
+        ))
+
+        let recordedRequest = await transport.lastRequest
+        let request = try XCTUnwrap(recordedRequest)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/platform/v1/projects/project-test/email/delivery-requests")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer project-token")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Idempotency-Key"), "email-1")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(queued.requestId, requestId)
+        XCTAssertEqual(queued.status, .accepted)
+
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: try XCTUnwrap(request.httpBody)) as? [String: Any]
+        )
+        XCTAssertEqual(body["recipient_email"] as? String, "recipient@example.test")
+        XCTAssertEqual(body["subject"] as? String, "Spectra verification")
+        XCTAssertEqual(body["text"] as? String, "Your code is 123456")
+        XCTAssertEqual(body["html"] as? String, "<p>Your code is <strong>123456</strong></p>")
+        XCTAssertEqual(
+            Set(body.keys),
+            Set(["recipient_email", "subject", "text", "html"])
+        )
+    }
+
+    func testFetchEmailDeliveryStatusUsesPrivacySafeProjectPath() async throws {
+        let requestId = UUID(uuidString: "00000000-0000-4000-8000-000000000007")!
+        let response = """
+        {
+          "data": {
+            "request_id": "\(requestId.uuidString.lowercased())",
+            "template_id": "developer_single_email.v1",
+            "recipient_masked": "r***@e***.test",
+            "status": "delivered",
+            "attempt_count": 1,
+            "created_at": "2026-07-24T02:20:00.000Z",
+            "updated_at": "2026-07-24T02:20:02.000Z",
+            "completed_at": "2026-07-24T02:20:02.000Z"
+          }
+        }
+        """.data(using: .utf8)!
+        let transport = RecordingTransport(response: response, statusCode: 200)
+        let client = makeClient(transport: transport)
+
+        let status = try await client.fetchEmailDeliveryRequest(requestId)
+        let request = await transport.lastRequest
+
+        XCTAssertEqual(request?.httpMethod, "GET")
+        XCTAssertEqual(request?.url?.path, "/platform/v1/projects/project-test/email/delivery-requests/\(requestId.uuidString.lowercased())")
+        XCTAssertEqual(status.requestId, requestId)
+        XCTAssertEqual(status.recipientMasked, "r***@e***.test")
+        XCTAssertEqual(status.status, .delivered)
+        XCTAssertEqual(status.attemptCount, 1)
+    }
+
     func testFetchSoundManifestUsesFutureSoundPath() async throws {
         let response = #"{"sounds":[{"id":"message","version":1,"fileName":"message-v1.caf","downloadURL":"https://cdn.example.test/message-v1.caf","checksum":"sha256:abc","enabled":true}]}"#.data(using: .utf8)!
         let transport = RecordingTransport(response: response, statusCode: 200)

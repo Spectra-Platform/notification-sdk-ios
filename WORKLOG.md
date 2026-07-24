@@ -1,5 +1,13 @@
 # WORKLOG — notification-sdk-ios
 
+## 2026-07-24 — Auth token 기반 Email delivery surface
+
+- 목적: NotificationSDK가 AuthSDK token provider를 받아 Delivery Platform의 Project Email API를 호출할 수 있게 한다.
+- 결과: `sendEmail`, `fetchEmailDeliveryRequest`, privacy-safe email delivery 모델과 fractional RFC3339 date decoding을 추가했다. SDK는 SMTP를 직접 보내지 않고 서버 API만 호출한다.
+- 검증: `swift test` 9 tests 통과.
+- 상세 로그:
+  [docs/work-logs/2026-07-24-04-auth-token-email-delivery-surface.md](docs/work-logs/2026-07-24-04-auth-token-email-delivery-surface.md)
+
 ## 2026-07-24 — NotificationSDK SwiftPM release readiness
 
 - 목적: iOS NotificationSDK를 Swift Package Manager Git URL로 붙일 수 있는 배포 준비 상태로 정리한다.
