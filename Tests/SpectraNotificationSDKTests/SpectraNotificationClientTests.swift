@@ -313,7 +313,109 @@ final class SpectraNotificationClientTests: XCTestCase {
         XCTAssertNil(storedInstallationID)
     }
 
-    private func makeClient(transport: RecordingTransport) -> SpectraNotificationClient {
+    func testSoundSyncManagerDownloadsValidWavAndReportsInstallation() async throws {
+        let soundURL = URL(string: "https://cdn.example.test/message-v1.wav")!
+        var wav = Data("RIFF".utf8)
+        wav.append(contentsOf: [0x04, 0x00, 0x00, 0x00])
+        wav.append(Data("WAVE".utf8))
+        let checksum = SpectraNotificationSoundSyncManager.sha256Hex(wav)
+        let manifest = """
+        {
+          "sounds": [
+            {
+              "id": "message",
+              "version": 1,
+              "fileName": "message-v1.wav",
+              "downloadURL": "\(soundURL.absoluteString)",
+              "checksum": "sha256:\(checksum)",
+              "enabled": true
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+        let transport = QueuedRecordingTransport(responses: [
+            .init(statusCode: 200, data: manifest),
+            .init(statusCode: 204, data: Data())
+        ])
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let manager = SpectraNotificationSoundSyncManager(
+            client: makeClient(transport: transport),
+            downloader: MockSoundDownloader(dataByURL: [soundURL: wav]),
+            installationStore: InMemorySpectraNotificationSoundInstallationStore(),
+            soundsDirectory: temporaryDirectory,
+            now: { Date(timeIntervalSince1970: 1_779_811_200) }
+        )
+        defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+
+        let results = try await manager.synchronize()
+
+        XCTAssertEqual(results, [
+            .init(soundID: "message", version: 1, fileName: "message-v1.wav", status: .installed)
+        ])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: temporaryDirectory.appendingPathComponent("message-v1.wav").path))
+        let requests = await transport.recordedRequests()
+        XCTAssertEqual(requests.map(\.httpMethod), ["GET", "PUT"])
+        XCTAssertEqual(requests.first?.url?.path, "/platform/v1/projects/project-test/notification/sounds/manifest")
+        XCTAssertEqual(requests.last?.url?.path, "/platform/v1/projects/project-test/notification/sounds/installations/message")
+    }
+
+    func testSoundChecksumSupportsHexAndSha256Prefix() {
+        let data = Data("fixture".utf8)
+        let checksum = SpectraNotificationSoundSyncManager.sha256Hex(data)
+
+        XCTAssertTrue(SpectraNotificationSoundSyncManager.checksumMatches(data, checksum: checksum))
+        XCTAssertTrue(SpectraNotificationSoundSyncManager.checksumMatches(data, checksum: "sha256:\(checksum)"))
+        XCTAssertFalse(SpectraNotificationSoundSyncManager.checksumMatches(data, checksum: "sha256:wrong"))
+    }
+
+    func testRichNotificationAttachmentParsesAndValidatesImagePayload() throws {
+        let userInfo: [AnyHashable: Any] = [
+            "rich_attachment": [
+                "kind": "image",
+                "url": "https://media.example.test/notification-preview/image.jpg",
+                "content_type": "image/jpeg; charset=binary",
+                "expires_at": "2026-07-25T13:00:00Z"
+            ]
+        ]
+
+        let attachment = try XCTUnwrap(SpectraRichNotificationAttachment(
+            userInfo: userInfo,
+            now: ISO8601DateFormatter().date(from: "2026-07-25T12:59:00Z")!
+        ))
+
+        XCTAssertEqual(attachment.kind, .image)
+        XCTAssertEqual(attachment.contentType, "image/jpeg")
+        XCTAssertEqual(attachment.supportedImageType?.fileExtension, "jpg")
+        XCTAssertTrue(attachment.acceptsImageResponse(
+            statusCode: 200,
+            mimeType: "image/jpeg",
+            expectedContentLength: 1024
+        ))
+        XCTAssertFalse(attachment.acceptsImageResponse(
+            statusCode: 200,
+            mimeType: "text/html",
+            expectedContentLength: 1024
+        ))
+    }
+
+    func testRichNotificationAttachmentRejectsExpiredPayload() {
+        let userInfo: [AnyHashable: Any] = [
+            "rich_attachment": [
+                "kind": "image",
+                "url": "https://media.example.test/notification-preview/image.jpg",
+                "content_type": "image/jpeg",
+                "expires_at": "2026-07-25T12:00:00Z"
+            ]
+        ]
+
+        XCTAssertNil(SpectraRichNotificationAttachment(
+            userInfo: userInfo,
+            now: ISO8601DateFormatter().date(from: "2026-07-25T12:00:01Z")!
+        ))
+    }
+
+    private func makeClient(transport: any SpectraNotificationTransport) -> SpectraNotificationClient {
         SpectraNotificationClient(
             configuration: .init(baseURL: URL(string: "http://127.0.0.1:3002")!, projectId: "project-test"),
             tokenProvider: StaticSpectraAccessTokenProvider(token: "project-token"),
@@ -321,7 +423,7 @@ final class SpectraNotificationClientTests: XCTestCase {
         )
     }
 
-    private func makeCommunityClient(transport: RecordingTransport) -> SpectraCommunityNotificationClient {
+    private func makeCommunityClient(transport: any SpectraNotificationTransport) -> SpectraCommunityNotificationClient {
         SpectraCommunityNotificationClient(
             configuration: .init(baseURL: URL(string: "http://127.0.0.1:8080")!),
             tokenProvider: StaticSpectraAccessTokenProvider(token: "oidc-user-token"),
@@ -379,6 +481,38 @@ actor RecordingTransport: SpectraNotificationTransport {
     func send(_ request: URLRequest) async throws -> SpectraNotificationResponse {
         lastRequest = request
         return SpectraNotificationResponse(statusCode: statusCode, data: response)
+    }
+}
+
+actor QueuedRecordingTransport: SpectraNotificationTransport {
+    private var responses: [SpectraNotificationResponse]
+    private var requests: [URLRequest] = []
+
+    init(responses: [SpectraNotificationResponse]) {
+        self.responses = responses
+    }
+
+    func send(_ request: URLRequest) async throws -> SpectraNotificationResponse {
+        requests.append(request)
+        guard responses.isEmpty == false else {
+            return SpectraNotificationResponse(statusCode: 500, data: Data())
+        }
+        return responses.removeFirst()
+    }
+
+    func recordedRequests() -> [URLRequest] {
+        requests
+    }
+}
+
+struct MockSoundDownloader: SpectraNotificationSoundDownloading {
+    let dataByURL: [URL: Data]
+
+    func data(from url: URL) async throws -> Data {
+        guard let data = dataByURL[url] else {
+            throw URLError(.fileDoesNotExist)
+        }
+        return data
     }
 }
 

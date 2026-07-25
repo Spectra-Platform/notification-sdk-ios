@@ -51,9 +51,16 @@ Implemented first slice:
 - iOS notification permission helper with injectable `UserNotifications`
   adapter
 - APNs installation ID persistence and device token registration manager
+- Dynamic iOS notification sound synchronization helper for
+  `Library/Sounds`
+- Rich notification attachment payload parser for Notification Service
+  Extensions
 
-The SDK does not persist downloaded sound files yet. iOS `Library/Sounds`
-download and checksum management remains a later implementation slice.
+The SDK can now download enabled manifest sounds, verify HTTPS URL, exact
+versioned filename, SHA-256 checksum and basic `.caf`/`.wav`/`.aiff` magic
+bytes, then atomically store the file in iOS `Library/Sounds`. If sound sync
+fails, push delivery should continue and fall back to an already installed or
+bundled sound.
 
 Email delivery requests are server-side requests, not local SMTP sends. Apps
 provide an AuthSDK-backed token provider to `SpectraNotificationClient`; the SDK
@@ -87,6 +94,36 @@ if granted {
         locale: .current,
         timeZone: .current
     )
+}
+```
+
+## 동적 알림음 동기화
+
+앱 시작 또는 foreground 진입 시 manifest를 확인하고, 설치된 파일만 APNs
+`sound` filename으로 사용하게 만든다.
+
+```swift
+let notificationClient = SpectraNotificationClient(
+    configuration: .init(
+        baseURL: URL(string: "https://api.spectra.kr")!,
+        projectId: "project_123"
+    ),
+    tokenProvider: authClient
+)
+
+let soundSync = SpectraNotificationSoundSyncManager(client: notificationClient)
+let results = try await soundSync.synchronize()
+```
+
+## Rich notification payload
+
+Notification Service Extension에서는 SDK parser로 `rich_attachment`를 먼저
+검증한 뒤, 지원되는 image일 때만 attachment 다운로드를 시도한다.
+
+```swift
+if let attachment = SpectraRichNotificationAttachment(userInfo: request.content.userInfo),
+   attachment.isSupportedImageAttachment {
+    // attachment.url을 다운로드하고 attachment.supportedImageType의 typeIdentifier 사용
 }
 ```
 
