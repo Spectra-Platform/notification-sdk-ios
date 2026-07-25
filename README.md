@@ -48,6 +48,9 @@ Implemented first slice:
   `PUT /v1/me/devices/{installation_id}` and device deactivation through
   `DELETE /v1/me/devices/{installation_id}`
 - Future-facing dynamic notification sound manifest/reporting surface
+- iOS notification permission helper with injectable `UserNotifications`
+  adapter
+- APNs installation ID persistence and device token registration manager
 
 The SDK does not persist downloaded sound files yet. iOS `Library/Sounds`
 download and checksum management remains a later implementation slice.
@@ -57,6 +60,35 @@ provide an AuthSDK-backed token provider to `SpectraNotificationClient`; the SDK
 then calls `POST /platform/v1/projects/{project_id}/email/delivery-requests`.
 Delivery Platform validates the project token through Auth Platform before
 queueing provider work.
+
+## iOS APNs 등록 예시
+
+앱은 AuthSDK에서 만든 token provider를 넘기고, NotificationSDK가 권한 상태와
+APNs device token 등록을 맡는다.
+
+```swift
+import SpectraNotificationSDK
+
+let client = SpectraCommunityNotificationClient(
+    configuration: .init(baseURL: URL(string: "https://api.spectra.kr")!),
+    tokenProvider: authClient
+)
+
+let permission = SpectraNotificationPermissionManager(
+    authorizer: UserNotificationAuthorizationAdapter()
+)
+
+let granted = try await permission.requestAuthorization()
+if granted {
+    // UIApplication.shared.registerForRemoteNotifications() 이후 받은 deviceToken 전달
+    let manager = SpectraAPNsDeviceRegistrationManager(client: client)
+    try await manager.registerAPNsDeviceToken(
+        deviceToken,
+        locale: .current,
+        timeZone: .current
+    )
+}
+```
 
 ## 로컬 검증
 

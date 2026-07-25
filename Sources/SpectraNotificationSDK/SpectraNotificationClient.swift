@@ -7,6 +7,10 @@ public enum SpectraNotificationClientError: Error, Equatable, Sendable {
     case emptyAccessToken
 }
 
+public enum SpectraAPNsDeviceRegistrationManagerError: Error, Equatable, Sendable {
+    case missingInstallationID
+}
+
 public struct SpectraNotificationClient: Sendable {
     public struct Configuration: Sendable {
         public let baseURL: URL

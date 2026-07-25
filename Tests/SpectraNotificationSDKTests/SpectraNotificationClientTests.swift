@@ -219,6 +219,100 @@ final class SpectraNotificationClientTests: XCTestCase {
         XCTAssertNil(request?.value(forHTTPHeaderField: "Content-Type"))
     }
 
+    func testNotificationPermissionManagerUsesInjectedAuthorizer() async throws {
+        let authorizer = MockNotificationAuthorizer(status: .notDetermined, requestResult: true)
+        let manager = SpectraNotificationPermissionManager(authorizer: authorizer)
+
+        let initialStatus = await manager.currentStatus()
+        let shouldRegisterBeforeRequest = await manager.shouldRegisterForRemoteNotifications()
+        XCTAssertEqual(initialStatus, .notDetermined)
+        XCTAssertFalse(shouldRegisterBeforeRequest)
+
+        let granted = try await manager.requestAuthorization(options: [.alert, .sound])
+
+        let lastRequestedOptions = await authorizer.currentLastRequestedOptions()
+        XCTAssertTrue(granted)
+        XCTAssertEqual(lastRequestedOptions, [.alert, .sound])
+        await authorizer.setStatus(.authorized)
+        let shouldRegisterAfterAuthorization = await manager.shouldRegisterForRemoteNotifications()
+        XCTAssertTrue(shouldRegisterAfterAuthorization)
+    }
+
+    func testAPNsDeviceTokenHexEncodingUsesLowercaseTwoDigitBytes() {
+        let data = Data([0x00, 0x01, 0x0f, 0x10, 0xff])
+
+        XCTAssertEqual(SpectraAPNsDeviceRegistrationManager.hexDeviceToken(data), "00010f10ff")
+    }
+
+    func testAPNsRegistrationManagerReusesGeneratedInstallationID() async throws {
+        let installationID = UUID(uuidString: "11111111-2222-4333-8444-555555555555")!
+        let store = InMemorySpectraInstallationIDStore()
+        let manager = SpectraAPNsDeviceRegistrationManager(
+            client: makeCommunityClient(transport: RecordingTransport(response: Data(), statusCode: 204)),
+            installationIDStore: store,
+            idGenerator: { installationID }
+        )
+
+        let first = try await manager.currentOrCreateInstallationID()
+        let second = try await manager.currentOrCreateInstallationID()
+
+        XCTAssertEqual(first, installationID)
+        XCTAssertEqual(second, installationID)
+    }
+
+    func testAPNsRegistrationManagerRegistersHexTokenWithStableInstallationID() async throws {
+        let installationID = UUID(uuidString: "46f6609f-c319-40e2-9f2b-3f305ad71942")!
+        let transport = RecordingTransport(
+            response: Self.communityDeviceEnvelope(installationID: installationID, status: "active"),
+            statusCode: 200
+        )
+        let store = InMemorySpectraInstallationIDStore()
+        let manager = SpectraAPNsDeviceRegistrationManager(
+            client: makeCommunityClient(transport: transport),
+            installationIDStore: store,
+            idGenerator: { installationID }
+        )
+
+        let registration = try await manager.registerAPNsDeviceToken(
+            Data([0xde, 0xad, 0xbe, 0xef]),
+            locale: Locale(identifier: "ko_KR"),
+            timeZone: TimeZone(identifier: "Asia/Seoul")!,
+            idempotencyKey: "manager-register-1"
+        )
+
+        let request = await transport.lastRequest
+        XCTAssertEqual(registration.installationID, installationID)
+        XCTAssertEqual(request?.httpMethod, "PUT")
+        XCTAssertEqual(request?.url?.path, "/v1/me/devices/\(installationID.uuidString.lowercased())")
+        XCTAssertEqual(request?.value(forHTTPHeaderField: "Idempotency-Key"), "manager-register-1")
+
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: try XCTUnwrap(request?.httpBody)) as? [String: Any]
+        )
+        XCTAssertEqual(body["device_token"] as? String, "deadbeef")
+        XCTAssertEqual(body["locale"] as? String, "ko_KR")
+        XCTAssertEqual(body["time_zone"] as? String, "Asia/Seoul")
+    }
+
+    func testAPNsRegistrationManagerUnregistersStoredInstallationAndClearsStore() async throws {
+        let installationID = UUID(uuidString: "46f6609f-c319-40e2-9f2b-3f305ad71942")!
+        let transport = RecordingTransport(response: Data(), statusCode: 204)
+        let store = InMemorySpectraInstallationIDStore(installationID: installationID)
+        let manager = SpectraAPNsDeviceRegistrationManager(
+            client: makeCommunityClient(transport: transport),
+            installationIDStore: store
+        )
+
+        try await manager.unregisterAPNsDevice(idempotencyKey: "manager-unregister-1")
+
+        let request = await transport.lastRequest
+        XCTAssertEqual(request?.httpMethod, "DELETE")
+        XCTAssertEqual(request?.url?.path, "/v1/me/devices/\(installationID.uuidString.lowercased())")
+        XCTAssertEqual(request?.value(forHTTPHeaderField: "Idempotency-Key"), "manager-unregister-1")
+        let storedInstallationID = await store.installationID()
+        XCTAssertNil(storedInstallationID)
+    }
+
     private func makeClient(transport: RecordingTransport) -> SpectraNotificationClient {
         SpectraNotificationClient(
             configuration: .init(baseURL: URL(string: "http://127.0.0.1:3002")!, projectId: "project-test"),
@@ -285,5 +379,33 @@ actor RecordingTransport: SpectraNotificationTransport {
     func send(_ request: URLRequest) async throws -> SpectraNotificationResponse {
         lastRequest = request
         return SpectraNotificationResponse(statusCode: statusCode, data: response)
+    }
+}
+
+actor MockNotificationAuthorizer: SpectraNotificationAuthorizing {
+    private var status: SpectraNotificationAuthorizationStatus
+    private let requestResult: Bool
+    private(set) var lastRequestedOptions: SpectraNotificationAuthorizationOptions?
+
+    init(status: SpectraNotificationAuthorizationStatus, requestResult: Bool) {
+        self.status = status
+        self.requestResult = requestResult
+    }
+
+    func authorizationStatus() async -> SpectraNotificationAuthorizationStatus {
+        status
+    }
+
+    func requestAuthorization(options: SpectraNotificationAuthorizationOptions) async throws -> Bool {
+        lastRequestedOptions = options
+        return requestResult
+    }
+
+    func setStatus(_ status: SpectraNotificationAuthorizationStatus) {
+        self.status = status
+    }
+
+    func currentLastRequestedOptions() -> SpectraNotificationAuthorizationOptions? {
+        lastRequestedOptions
     }
 }
