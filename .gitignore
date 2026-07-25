@@ -2,3 +2,6 @@
 .swiftpm/
 DerivedData/
 *.xcuserstate
+docs/
+WORKLOG.md
+HANDOFF.md
