@@ -4,6 +4,8 @@ Local Swift Package for Spectra Platform Push/Notification integration.
 
 Implemented first slice:
 
+- SDK-owned production Delivery endpoint defaults to `https://api.spectra.kr`.
+  App integrations normally pass only `projectId` and a token provider.
 - Project-token based device registration
 - Device deactivation
 - Test push delivery request

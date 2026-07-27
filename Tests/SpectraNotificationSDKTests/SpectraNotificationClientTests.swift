@@ -3,6 +3,13 @@ import XCTest
 @testable import SpectraNotificationSDK
 
 final class SpectraNotificationClientTests: XCTestCase {
+    func testProductionConfigurationOwnsDeliveryEndpoint() {
+        let configuration = SpectraNotificationClient.Configuration.production(projectId: "project-test")
+
+        XCTAssertEqual(configuration.baseURL.absoluteString, "https://api.spectra.kr")
+        XCTAssertEqual(configuration.projectId, "project-test")
+    }
+
     func testRegisterDeviceUsesProjectTokenAndContractPath() async throws {
         let transport = RecordingTransport(response: Self.deviceEnvelope(status: "active"), statusCode: 201)
         let client = makeClient(transport: transport)

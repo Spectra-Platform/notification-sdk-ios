@@ -9,12 +9,22 @@ public enum SpectraNotificationClientError: Error, Equatable, Sendable {
 
 public struct SpectraNotificationClient: Sendable {
     public struct Configuration: Sendable {
+        public static let productionBaseURL = URL(string: "https://api.spectra.kr")!
+
         public let baseURL: URL
         public let projectId: String
 
-        public init(baseURL: URL, projectId: String) {
+        public init(baseURL: URL = Self.productionBaseURL, projectId: String) {
             self.baseURL = baseURL
             self.projectId = projectId
+        }
+
+        public static func production(projectId: String) -> Configuration {
+            Configuration(projectId: projectId)
+        }
+
+        public static func custom(baseURL: URL, projectId: String) -> Configuration {
+            Configuration(baseURL: baseURL, projectId: projectId)
         }
     }
 
@@ -36,6 +46,26 @@ public struct SpectraNotificationClient: Sendable {
         self.decoder = JSONDecoder()
         self.encoder.dateEncodingStrategy = .iso8601
         self.decoder.dateDecodingStrategy = .iso8601
+    }
+
+    public init(
+        projectId: String,
+        tokenProvider: any SpectraAccessTokenProviding,
+        transport: any SpectraNotificationTransport = URLSessionSpectraNotificationTransport()
+    ) {
+        self.init(
+            configuration: .production(projectId: projectId),
+            tokenProvider: tokenProvider,
+            transport: transport
+        )
+    }
+
+    public init(
+        auth tokenProvider: any SpectraAccessTokenProviding,
+        projectID: String,
+        transport: any SpectraNotificationTransport = URLSessionSpectraNotificationTransport()
+    ) {
+        self.init(projectId: projectID, tokenProvider: tokenProvider, transport: transport)
     }
 
     public func registerDevice(_ registration: SpectraPushDeviceRegistration) async throws -> SpectraPushDevice {
