@@ -134,6 +134,79 @@ public struct SpectraPushQueuedDelivery: Codable, Equatable, Sendable {
     }
 }
 
+public struct SpectraEmailDeliveryRequest: Encodable, Equatable, Sendable {
+    public let recipientEmail: String
+    public let subject: String
+    public let text: String
+    public let html: String?
+    public let idempotencyKey: String
+
+    public init(
+        recipientEmail: String,
+        subject: String,
+        text: String,
+        html: String? = nil,
+        idempotencyKey: String
+    ) {
+        self.recipientEmail = recipientEmail
+        self.subject = subject
+        self.text = text
+        self.html = html
+        self.idempotencyKey = idempotencyKey
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case recipientEmail = "recipient_email"
+        case subject
+        case text
+        case html
+    }
+}
+
+public enum SpectraEmailDeliveryStatusValue: String, Codable, Equatable, Sendable {
+    case accepted
+    case queued
+    case sending
+    case delivered
+    case failed
+}
+
+public struct SpectraEmailQueuedDelivery: Codable, Equatable, Sendable {
+    public let requestId: UUID
+    public let status: SpectraEmailDeliveryStatusValue
+    public let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case requestId = "request_id"
+        case status
+        case createdAt = "created_at"
+    }
+}
+
+public struct SpectraEmailDeliveryStatus: Codable, Equatable, Sendable {
+    public let requestId: UUID
+    public let templateId: String
+    public let recipientMasked: String?
+    public let status: SpectraEmailDeliveryStatusValue
+    public let attemptCount: Int
+    public let createdAt: Date
+    public let updatedAt: Date
+    public let completedAt: Date?
+    public let failureCode: String?
+
+    enum CodingKeys: String, CodingKey {
+        case requestId = "request_id"
+        case templateId = "template_id"
+        case recipientMasked = "recipient_masked"
+        case status
+        case attemptCount = "attempt_count"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case completedAt = "completed_at"
+        case failureCode = "failure_code"
+    }
+}
+
 public struct SpectraNotificationSound: Codable, Equatable, Sendable {
     public let id: String
     public let version: Int
