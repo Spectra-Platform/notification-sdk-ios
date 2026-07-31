@@ -2,6 +2,13 @@
 
 Swift Package for Spectra Platform Push/Notification integration.
 
+This package is the client/mobile Notification SDK. It is designed around app
+actions such as requesting notification permission, registering the current
+device, handling notification payloads, syncing notification sounds and opening
+deep links. It does not make mobile apps aware of Delivery Platform internals,
+and mobile/browser bundles must never contain Project API tokens or provider
+secrets.
+
 For app integration, use [iOS NotificationSDK integration guide](docs/guides/ios-notification-sdk-integration.md).
 
 ## 설치
@@ -40,12 +47,9 @@ target dependency에는 product 이름을 사용한다.
 
 Implemented first slice:
 
-- SDK-owned production Delivery endpoint defaults to `https://api.spectra.kr`.
-  App integrations normally pass only `projectId` and a token provider.
-- Project-token based device registration
-- Device deactivation
-- Test push delivery request
-- Project-token based single email delivery request through Delivery Platform
+- App-facing APNs permission and device registration flow.
+- SDK-owned production Notification endpoint defaults to `https://api.spectra.kr`.
+  App integrations normally pass only an AuthSDK-backed token provider.
 - Community user-token based APNs device registration through
   `PUT /v1/me/devices/{installation_id}` and device deactivation through
   `DELETE /v1/me/devices/{installation_id}`
@@ -58,17 +62,16 @@ Implemented first slice:
 - Rich notification attachment payload parser for Notification Service
   Extensions
 
+Legacy/project-scoped helpers for device registration, test push and email send
+still exist for compatibility and internal tooling, but they are not the mobile
+client SDK surface. Mobile apps must not embed Project API tokens; server-side
+email/push send belongs in a future Server SDK or the app backend.
+
 The SDK can now download enabled manifest sounds, verify HTTPS URL, exact
 versioned filename, SHA-256 checksum and basic `.caf`/`.wav`/`.aiff` magic
 bytes, then atomically store the file in iOS `Library/Sounds`. If sound sync
 fails, push delivery should continue and fall back to an already installed or
 bundled sound.
-
-Email delivery requests are server-side requests, not local SMTP sends. Apps
-provide an AuthSDK-backed token provider to `SpectraNotificationClient`; the SDK
-then calls `POST /platform/v1/projects/{project_id}/email/delivery-requests`.
-Delivery Platform validates the project token through Auth Platform before
-queueing provider work.
 
 ## iOS APNs 등록 예시
 
@@ -102,7 +105,8 @@ if granted {
 ## 동적 알림음 동기화
 
 앱 시작 또는 foreground 진입 시 manifest를 확인하고, 설치된 파일만 APNs
-`sound` filename으로 사용하게 만든다.
+`sound` filename으로 사용하게 만든다. 이 흐름은 app-user token provider로
+호출되어야 하며, Project API token을 앱에 넣지 않는다.
 
 ```swift
 let notificationClient = SpectraNotificationClient(

@@ -3,7 +3,7 @@ import XCTest
 @testable import SpectraNotificationSDK
 
 final class SpectraNotificationClientTests: XCTestCase {
-    func testProductionConfigurationOwnsDeliveryEndpoint() {
+    func testProductionConfigurationOwnsNotificationEndpoint() {
         let configuration = SpectraNotificationClient.Configuration.production(projectId: "project-test")
 
         XCTAssertEqual(configuration.baseURL.absoluteString, "https://api.spectra.kr")

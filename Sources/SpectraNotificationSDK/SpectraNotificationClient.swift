@@ -71,6 +71,7 @@ public struct SpectraNotificationClient: Sendable {
         self.init(projectId: projectID, tokenProvider: tokenProvider, transport: transport)
     }
 
+    @available(*, deprecated, message: "Project-scoped device registration is a server/testing compatibility surface. Mobile apps should use SpectraCommunityNotificationClient or SpectraAPNsDeviceRegistrationManager.")
     public func registerDevice(_ registration: SpectraPushDeviceRegistration) async throws -> SpectraPushDevice {
         var request = try await makeRequest(
             method: "PUT",
@@ -82,6 +83,7 @@ public struct SpectraNotificationClient: Sendable {
         return response.data
     }
 
+    @available(*, deprecated, message: "Project-scoped device deactivation is a server/testing compatibility surface. Mobile apps should unregister through SpectraCommunityNotificationClient or SpectraAPNsDeviceRegistrationManager.")
     public func deactivateDevice(deviceId: UUID) async throws {
         let request = try await makeRequest(
             method: "DELETE",
@@ -90,6 +92,7 @@ public struct SpectraNotificationClient: Sendable {
         _ = try await sendEmpty(request, expectedStatusCodes: [204])
     }
 
+    @available(*, deprecated, message: "Push sending is a server-side/testing surface. Mobile apps should register the current device and handle notification events instead.")
     public func sendTestPush(_ push: SpectraPushDeliveryRequest) async throws -> SpectraPushQueuedDelivery {
         var request = try await makeRequest(
             method: "POST",
@@ -101,6 +104,7 @@ public struct SpectraNotificationClient: Sendable {
         return response.data
     }
 
+    @available(*, deprecated, message: "Email send belongs in a server SDK or backend using a Project API token. Mobile apps must not send project-authorized email directly.")
     public func sendEmail(_ email: SpectraEmailDeliveryRequest) async throws -> SpectraEmailQueuedDelivery {
         var request = try await makeRequest(
             method: "POST",
@@ -112,6 +116,7 @@ public struct SpectraNotificationClient: Sendable {
         return response.data
     }
 
+    @available(*, deprecated, message: "Email delivery status lookup belongs with the server-side email surface, not the mobile Notification SDK.")
     public func fetchEmailDeliveryRequest(_ requestId: UUID) async throws -> SpectraEmailDeliveryStatus {
         let request = try await makeRequest(
             method: "GET",

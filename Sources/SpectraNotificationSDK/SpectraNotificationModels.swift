@@ -15,6 +15,7 @@ public enum SpectraPushProvider: String, Codable, Sendable {
     case fcm
 }
 
+@available(*, deprecated, message: "Project-scoped device registration is a server/testing compatibility model. Mobile apps should use SpectraCommunityAPNsDeviceRegistration.")
 public struct SpectraPushDeviceRegistration: Encodable, Equatable, Sendable {
     public let deviceId: UUID
     public let appInstanceId: UUID
@@ -59,6 +60,7 @@ public struct SpectraPushDeviceRegistration: Encodable, Equatable, Sendable {
     }
 }
 
+@available(*, deprecated, message: "Project-scoped push device response is a server/testing compatibility model. Mobile apps should use SpectraCommunityPushDeviceRegistration.")
 public struct SpectraPushDevice: Codable, Equatable, Sendable {
     public let deviceId: UUID
     public let appInstanceId: UUID
@@ -89,6 +91,7 @@ public struct SpectraPushDevice: Codable, Equatable, Sendable {
     }
 }
 
+@available(*, deprecated, message: "Push delivery enqueue is a server-side/testing surface. Mobile apps should register devices and handle received/opened notification events.")
 public struct SpectraPushDeliveryRequest: Encodable, Equatable, Sendable {
     public let deviceId: UUID
     public let title: String
@@ -122,6 +125,7 @@ public struct SpectraPushDeliveryRequest: Encodable, Equatable, Sendable {
     }
 }
 
+@available(*, deprecated, message: "Push delivery enqueue results belong to the server-side/testing surface, not app-facing notification registration.")
 public struct SpectraPushQueuedDelivery: Codable, Equatable, Sendable {
     public let requestId: UUID
     public let status: String
@@ -134,6 +138,7 @@ public struct SpectraPushQueuedDelivery: Codable, Equatable, Sendable {
     }
 }
 
+@available(*, deprecated, message: "Email sending belongs in a server SDK or backend using a Project API token. Mobile apps must not send project-authorized email directly.")
 public struct SpectraEmailDeliveryRequest: Encodable, Equatable, Sendable {
     public let recipientEmail: String
     public let subject: String
@@ -163,6 +168,7 @@ public struct SpectraEmailDeliveryRequest: Encodable, Equatable, Sendable {
     }
 }
 
+@available(*, deprecated, message: "Email delivery status belongs to the server-side email surface.")
 public enum SpectraEmailDeliveryStatusValue: String, Codable, Equatable, Sendable {
     case accepted
     case queued
@@ -171,6 +177,7 @@ public enum SpectraEmailDeliveryStatusValue: String, Codable, Equatable, Sendabl
     case failed
 }
 
+@available(*, deprecated, message: "Email queued delivery belongs to the server-side email surface.")
 public struct SpectraEmailQueuedDelivery: Codable, Equatable, Sendable {
     public let requestId: UUID
     public let status: SpectraEmailDeliveryStatusValue
@@ -183,6 +190,7 @@ public struct SpectraEmailQueuedDelivery: Codable, Equatable, Sendable {
     }
 }
 
+@available(*, deprecated, message: "Email delivery status lookup belongs to the server-side email surface.")
 public struct SpectraEmailDeliveryStatus: Codable, Equatable, Sendable {
     public let requestId: UUID
     public let templateId: String
